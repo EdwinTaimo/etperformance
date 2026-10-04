@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pong Game</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0f172a, #111827);
+      font-family: Arial, sans-serif;
+      color: white;
+    }
+
+    .game-wrap {
+      text-align: center;
+    }
+
+    canvas {
+      background: #020817;
+      border: 4px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 0 25px rgba(148, 163, 184, 0.4);
+    }
+
+    .scoreboard {
+      margin-bottom: 12px;
+      font-size: 2rem;
+      font-weight: bold;
+      letter-spacing: 2px;
+    }
+
+    .controls {
+      margin-top: 12px;
+      font-size: 0.95rem;
+      color: #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+  <div class="game-wrap">
+    <div class="scoreboard">
+      <span id="leftScore">0</span> : <span id="rightScore">0</span>
+    </div>
+
+    <canvas id="gameCanvas" width="900" height="500"></canvas>
+
+    <div class="controls">
+      Move with mouse or Arrow Up / Arrow Down
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const leftScoreEl = document.getElementById("leftScore");
+    const rightScoreEl = document.getElementById("rightScore");
+
+    const leftPaddle = {
+      x: 20,
+      y: canvas.height / 2 - 60,
+      width: 14,
+      height: 120,
+      speed: 7
+    };
+
+    const rightPaddle = {
+      x: canvas.width - 34,
+      y: canvas.height / 2 - 60,
+      width: 14,
+      height: 120,
+      speed: 5
+    };
+
+    const ball = {
+      x: canvas.width / 2,
+      y: canvas.height / 2,
+      radius: 9,
+      vx: 5,
+      vy: 3
+    };
+
+    let leftScore = 0;
+    let rightScore = 0;
+    let mouseY = canvas.height / 2;
+    let mouseActive = false;
+
+    const keys = {
+      ArrowUp: false,
+      ArrowDown: false
+    };
+
+    function updateScore() {
+      leftScoreEl.textContent = leftScore;
+      rightScoreEl.textContent = rightScore;
+    }
+
+    function resetBall(direction) {
+      ball.x = canvas.width / 2;
+      ball.y = canvas.height / 2;
+
+      const speed = 5 + Math.random() * 1.5;
+      const angle = (Math.random() * 1.2) - 0.6;
+
+      ball.vx = direction * speed;
+      ball.vy = angle * 5;
+    }
+
+    function scorePoint(player) {
+      if (player === "left") {
+        leftScore++;
+      } else {
+        rightScore++;
+      }
+
+      updateScore();
+
+      if (player === "left") {
+        resetBall(1);
+      } else {
+        resetBall(-1);
+      }
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), max);
+    }
+
+    function moveLeftPaddle() {
+      let targetY = leftPaddle.y;
+
+      if (keys.ArrowUp) {
+        targetY -= leftPaddle.speed;
+      } else if (keys.ArrowDown) {
+        targetY += leftPaddle.speed;
+      } else if (mouseActive) {
+        targetY = mouseY - leftPaddle.height / 2;
+      }
+
+      leftPaddle.y = clamp(targetY, 0, canvas.height - leftPaddle.height);
+    }
+
+    function moveRightPaddle() {
+      const paddleCenter = rightPaddle.y + rightPaddle.height / 2;
+      const target = ball.y - rightPaddle.height / 2;
+
+      rightPaddle.y += (target - rightPaddle.y) * 0.12;
+      rightPaddle.y = clamp(rightPaddle.y, 0, canvas.height - rightPaddle.height);
+    }
+
+    function handleBallCollisionWithPaddles() {
+      const leftRect = {
+        left: leftPaddle.x,
+        right: leftPaddle.x + leftPaddle.width,
+        top: leftPaddle.y,
+        bottom: leftPaddle.y + leftPaddle.height
+      };
+
+      const rightRect = {
+        left: rightPaddle.x,
+        right: rightPaddle.x + rightPaddle.width,
+        top: rightPaddle.y,
+        bottom: rightPaddle.y + rightPaddle.height
+      };
+
+      if (
+        ball.x - ball.radius <= leftRect.right &&
+        ball.x + ball.radius >= leftRect.left &&
+        ball.y >= leftRect.top &&
+        ball.y <= leftRect.bottom &&
+        ball.vx < 0
+      ) {
+        const collisionPoint = (ball.y - (leftPaddle.y + leftPaddle.height / 2)) / (leftPaddle.height / 2);
+        const angle = collisionPoint * 1.2;
+        const speed = Math.min(Math.abs(ball.vx) + 0.5, 11);
+
+        ball.vx = speed;
+        ball.vy = angle * 5;
+      }
+
+      if (
+        ball.x + ball.radius >= rightRect.left &&
+        ball.x - ball.radius <= rightRect.right &&
+        ball.y >= rightRect.top &&
+        ball.y <= rightRect.bottom &&
+        ball.vx > 0
+      ) {
+        const collisionPoint = (ball.y - (rightPaddle.y + rightPaddle.height / 2)) / (rightPaddle.height / 2);
+        const angle = collisionPoint * 1.2;
+        const speed = Math.min(Math.abs(ball.vx) + 0.5, 11);
+
+        ball.vx = -speed;
+        ball.vy = angle * 5;
+      }
+    }
+
+    function updateBall() {
+      ball.x += ball.vx;
+      ball.y += ball.vy;
+
+      if (ball.y - ball.radius <= 0 || ball.y + ball.radius >= canvas.height) {
+        ball.vy *= -1;
+      }
+
+      if (ball.x - ball.radius <= 0) {
+        scorePoint("right");
+      } else if (ball.x + ball.radius >= canvas.width) {
+        scorePoint("left");
+      }
+
+      handleBallCollisionWithPaddles();
+    }
+
+    function drawPaddle(paddle) {
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+    }
+
+    function drawBall() {
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      ctx.fillStyle = "#fbbf24";
+      ctx.fill();
+      ctx.closePath();
+    }
+
+    function drawCenterLine() {
+      ctx.strokeStyle = "rgba(255,255,255,0.35)";
+      ctx.setLineDash([12, 12]);
+      ctx.beginPath();
+      ctx.moveTo(canvas.width / 2, 0);
+      ctx.lineTo(canvas.width / 2, canvas.height);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawCenterLine();
+      drawPaddle(leftPaddle);
+      drawPaddle(rightPaddle);
+      drawBall();
+    }
+
+    function gameLoop() {
+      moveLeftPaddle();
+      moveRightPaddle();
+      updateBall();
+      draw();
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key in keys) {
+        keys[event.key] = true;
+      }
+    });
+
+    document.addEventListener("keyup", (event) => {
+      if (event.key in keys) {
+        keys[event.key] = false;
+      }
+    });
+
+    canvas.addEventListener("mousemove", (event) => {
+      const rect = canvas.getBoundingClientRect();
+      mouseY = event.clientY - rect.top;
+      mouseActive = true;
+    });
+
+    updateScore();
+    resetBall(1);
+    requestAnimationFrame(gameLoop);
+  </script>
+</body>
+</html>
